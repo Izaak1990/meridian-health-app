@@ -40,10 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── SECURITY ISSUE 1: Hardcoded credential (Bandit B105) ─────────────────────
-# This is what TruffleHog and Bandit will flag.
-# In production, use: os.environ.get("DEBUG_PASSWORD")
-DEBUG_PASSWORD = "meridian_debug_2024"  # noqa: S105 — Bandit will catch this
+
 
 # ── In-memory data store (no database for simplicity) ─────────────────────────
 patients_db: dict = {
@@ -102,12 +99,6 @@ def get_api_key(x_api_key: str = Header(default=None)):
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
     return x_api_key
 
-# ── SECURITY ISSUE 2: assert used for auth logic (Bandit B101) ───────────────
-def legacy_admin_check(token: str) -> bool:
-    """Legacy admin check — uses assert which can be disabled with -O flag."""
-    # Bandit B101: use of assert detected
-    assert token == "admin-token-2024", "Unauthorised"  # nosec — left for demo
-    return True
 
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/health")
@@ -169,24 +160,8 @@ def create_appointment(appt: AppointmentCreate, api_key: str = Depends(get_api_k
     logger.info(f"Appointment created for patient {appt.patient_id}")
     return new_appt
 
-# ── SECURITY ISSUE 3: bare except clause (Bandit B110) ───────────────────────
-@app.get("/api/records/{patient_id}/export")
-def export_patient_records(patient_id: str, api_key: str = Depends(get_api_key)):
-    """Export patient records. Has a bare except — Bandit B110 will flag this."""
-    try:
-        patient = patients_db.get(patient_id)
-        if not patient:
-            raise HTTPException(status_code=404, detail="Patient not found")
-        # Simulate record processing
-        record_hash = hashlib.sha256(str(patient).encode()).hexdigest()
-        return {
-            "patient_id": patient_id,
-            "export_time": datetime.utcnow().isoformat(),
-            "record_hash": record_hash,
-            "data": patient
-        }
-    except:  # noqa: E722 — Bandit B110 will catch this bare except
-        raise HTTPException(status_code=500, detail="Export failed")
+
+
 
 # ── Audit log ─────────────────────────────────────────────────────────────────
 audit_log: list = []
